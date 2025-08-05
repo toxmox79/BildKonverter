@@ -1,21 +1,23 @@
 {
     "name": "Bild Konverter PWA",
     "short_name": "BildKonverter",
-    "description": "Konvertieren Sie Ihre Bilder zu JPG mit 1600x1600 Pixeln",
+    "description": "Konvertiere Bilder zu JPG mit 1600x1600 Pixeln",
     "start_url": "/",
     "display": "standalone",
     "background_color": "#f5f5f7",
     "theme_color": "#93c01f",
     "icons": [
         {
-            "src": "icon.png",
+            "src": "/icon.png",
             "sizes": "192x192",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         },
         {
-            "src": "icon-512.png",
+            "src": "/icon-512.png",
             "sizes": "512x512",
-            "type": "image/png"
+            "type": "image/png",
+            "purpose": "any"
         }
     ]
 }
