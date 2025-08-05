@@ -4,9 +4,21 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#93c01f">
-    <meta name="description" content="Konvertiere Bilder zu JPG mit 1600x1600 Pixeln">
-    <link rel="manifest" href="/manifest.json">
-    <link rel="apple-touch-icon" href="/icon.png">
+    <meta name="description" content="Konvertieren Sie Ihre Bilder zu JPG mit 1600x1600 Pixeln">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Bild Konverter">
+    <meta name="mobile-web-app-capable" content="yes">
+    
+    <!-- Favicon and App Icons -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' fill='%2393c01f' rx='4'/%3E%3Crect x='6' y='10' width='20' height='12' fill='white' stroke='%236e6e73' stroke-width='0.5'/%3E%3Ccircle cx='12' cy='16' r='1.5' fill='%2393c01f'/%3E%3Cpath d='M8 20l3-3 2 2 4-4 2 2v3z' fill='%2393c01f'/%3E%3Ctext x='16' y='28' text-anchor='middle' fill='white' font-family='Arial' font-size='4' font-weight='bold'%3EJPG%3C/text%3E%3C/svg%3E">
+    
+    <!-- Apple Touch Icons -->
+    <link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 180 180'%3E%3Crect width='180' height='180' fill='%2393c01f' rx='40'/%3E%3Crect x='30' y='50' width='120' height='80' fill='white' stroke='%236e6e73' stroke-width='2' rx='5'/%3E%3Ccircle cx='70' cy='90' r='10' fill='%2393c01f'/%3E%3Cpath d='M40 120l20-20 15 15 25-25 15 15v15z' fill='%2393c01f'/%3E%3Ctext x='90' y='160' text-anchor='middle' fill='white' font-family='Arial' font-size='16' font-weight='bold'%3EJPG%3C/text%3E%3C/svg%3E">
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
     <title>Bild Konverter PWA</title>
     <style>
         body {
@@ -130,17 +142,77 @@
             border-radius: 10px;
             box-sizing: border-box;
         }
+        
+        /* PWA Install Prompt Styles */
+        .install-prompt {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #93c01f;
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+            display: none;
+            align-items: center;
+            gap: 10px;
+            z-index: 1000;
+        }
+        .install-prompt button {
+            padding: 8px 15px;
+            margin: 0 5px;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .install-prompt .install-btn {
+            background: white;
+            color: #93c01f;
+        }
+        .install-prompt .dismiss-btn {
+            background: transparent;
+            border: 1px solid white;
+        }
+        
+        /* Update Available Notification */
+        .update-available {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #007aff;
+            color: white;
+            padding: 10px 20px;
+            border-radius: 10px;
+            display: none;
+            align-items: center;
+            gap: 10px;
+            z-index: 1001;
+        }
     </style>
 </head>
 <body>
+    <!-- PWA Install Prompt -->
+    <div class="install-prompt" id="installPrompt">
+        <span>📱 App installieren für bessere Nutzung</span>
+        <button class="install-btn" id="installBtn">Installieren</button>
+        <button class="dismiss-btn" id="dismissBtn">Später</button>
+    </div>
+    
+    <!-- Update Available Notification -->
+    <div class="update-available" id="updateAvailable">
+        <span>🔄 Update verfügbar</span>
+        <button onclick="refreshApp()">Aktualisieren</button>
+    </div>
+
     <div class="container">
         <div class="header">🎨 Bild Konverter PWA</div>
-        <div class="info">Konvertieren Sie Ihre Bilder zu JPG mit 1600x1600 Pixeln (Einfügen aus Zwischenablage möglich)</div>
+        <div class="info">Konvertieren Sie Ihre Bilder zu JPG mit 1600x1600 Pixeln</div>
         <div class="url-input">
             <input type="text" id="imageUrl" placeholder="Bild-URL einfügen" style="display: block;">
             <button onclick="loadFromUrl()">URL laden</button>
         </div>
-        <div class="drop-zone" id="dropZone" contenteditable="true">
+        <div class="drop-zone" id="dropZone">
             <input type="file" id="fileInput" accept="image/*" style="display: none;">
             <label for="fileInput" class="drop-zone-label">📸 Bild auswählen oder hier ablegen</label>
         </div>
@@ -163,12 +235,82 @@
     </div>
 
     <script>
+        let deferredPrompt;
+        let newWorker;
+
+        // Service Worker Registration with Update Handling
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('/service-worker.js')
-                .then(() => console.log('Service Worker registered'))
+            navigator.serviceWorker.register('service-worker.js')
+                .then((registration) => {
+                    console.log('Service Worker registered:', registration);
+                    
+                    // Check for updates
+                    registration.addEventListener('updatefound', () => {
+                        newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                // New update available
+                                showUpdateAvailable();
+                            }
+                        });
+                    });
+                })
                 .catch(err => console.error('Service Worker registration failed:', err));
+
+            // Listen for controlling service worker changes
+            navigator.serviceWorker.addEventListener('controllerchange', () => {
+                window.location.reload();
+            });
         }
 
+        // PWA Install Prompt
+        window.addEventListener('beforeinstallprompt', (e) => {
+            e.preventDefault();
+            deferredPrompt = e;
+            showInstallPrompt();
+        });
+
+        function showInstallPrompt() {
+            const installPrompt = document.getElementById('installPrompt');
+            installPrompt.style.display = 'flex';
+        }
+
+        function showUpdateAvailable() {
+            const updateAvailable = document.getElementById('updateAvailable');
+            updateAvailable.style.display = 'flex';
+        }
+
+        function refreshApp() {
+            if (newWorker) {
+                newWorker.postMessage({ type: 'SKIP_WAITING' });
+            }
+        }
+
+        // Install button click
+        document.getElementById('installBtn').addEventListener('click', async () => {
+            if (deferredPrompt) {
+                deferredPrompt.prompt();
+                const { outcome } = await deferredPrompt.userChoice;
+                console.log(`User response to the install prompt: ${outcome}`);
+                deferredPrompt = null;
+                document.getElementById('installPrompt').style.display = 'none';
+            }
+        });
+
+        // Dismiss install prompt
+        document.getElementById('dismissBtn').addEventListener('click', () => {
+            document.getElementById('installPrompt').style.display = 'none';
+            deferredPrompt = null;
+        });
+
+        // Hide install prompt if app is already installed
+        window.addEventListener('appinstalled', () => {
+            console.log('PWA was installed');
+            document.getElementById('installPrompt').style.display = 'none';
+            deferredPrompt = null;
+        });
+
+        // Image handling code (from original HTML)
         const dropZone = document.getElementById('dropZone');
         const fileInput = document.getElementById('fileInput');
         const previewImg = document.getElementById('previewImg');
@@ -208,42 +350,6 @@
 
         fileInput.addEventListener('change', (e) => {
             handleFiles(e.target.files);
-        });
-
-        document.addEventListener('paste', (e) => {
-            const items = (e.clipboardData || window.clipboardData).items;
-            if (!items) {
-                alert('Zwischenablage-Funktion wird von Ihrem Browser nicht unterstützt.');
-                return;
-            }
-            for (let i = 0; i < items.length; i++) {
-                if (items[i].type.indexOf('image') === 0) {
-                    e.preventDefault();
-                    const blob = items[i].getAsFile();
-                    const reader = new FileReader();
-                    reader.onload = (event) => {
-                        previewImg.src = event.target.result;
-                        previewImg.style.display = 'block';
-                        const img = new Image();
-                        img.onload = () => {
-                            document.getElementById('origFormat').textContent = blob.type.split('/')[1].toUpperCase();
-                            document.getElementById('origSize').textContent = `${img.width} × ${img.height} px`;
-                            const preview = document.getElementById('preview');
-                            const previewWidth = preview.offsetWidth;
-                            const previewHeight = preview.offsetHeight;
-                            scale = Math.min(previewWidth / img.width, previewHeight / img.height);
-                            posX = (previewWidth - img.width * scale) / 2;
-                            posY = (previewHeight - img.height * scale) / 2;
-                            updateTransform();
-                            zoomSlider.value = scale;
-                            document.getElementById('zoomLevel').textContent = `${(scale * 100).toFixed(0)}%`;
-                        };
-                        img.src = event.target.result;
-                    };
-                    reader.readAsDataURL(blob);
-                    break;
-                }
-            }
         });
 
         function handleFiles(files) {
@@ -354,17 +460,59 @@
         });
 
         function downloadImage() {
+            if (!previewImg.src || previewImg.src === '') {
+                alert('Bitte wählen Sie zuerst ein Bild aus!');
+                return;
+            }
+
             const canvas = document.createElement('canvas');
             canvas.width = 1600;
             canvas.height = 1600;
             const ctx = canvas.getContext('2d');
-            const previewRect = document.getElementById('preview').getBoundingClientRect();
-            ctx.drawImage(previewImg, -posX * (1600 / previewRect.width) / scale, -posY * (1600 / previewRect.height) / scale, 1600 / scale, 1600 / scale);
-            const link = document.createElement('a');
-            link.download = `converted_image.jpg`;
-            link.href = canvas.toDataURL('image/jpeg');
-            link.click();
+            
+            // Weißer Hintergrund für JPG
+            ctx.fillStyle = 'white';
+            ctx.fillRect(0, 0, 1600, 1600);
+
+            const img = new Image();
+            img.crossOrigin = 'anonymous'; // Für externe URLs
+            
+            img.onload = () => {
+                try {
+                    // Berechne die Position und Größe für das 1600x1600 Canvas
+                    const previewRect = document.getElementById('preview').getBoundingClientRect();
+                    const scaleX = 1600 / previewRect.width;
+                    const scaleY = 1600 / previewRect.height;
+                    
+                    // Verwende die aktuelle Transformation vom Preview
+                    const drawX = -posX * scaleX / scale;
+                    const drawY = -posY * scaleY / scale;
+                    const drawWidth = img.width * scaleX / scale;
+                    const drawHeight = img.height * scaleY / scale;
+                    
+                    ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+                    
+                    // Als JPG mit hoher Qualität herunterladen
+                    canvas.toBlob((blob) => {
+                        const url = URL.createObjectURL(blob);
+                        const link = document.createElement('a');
+                        link.download = `converted_image_${Date.now()}.jpg`;
+                        link.href = url;
+                        document.body.appendChild(link);
+                        link.click();
+                        document.body.removeChild(link);
+                        URL.revokeObjectURL(url);
+                    }, 'image/jpeg', 0.95);
+                    
+                } catch (error) {
+                    console.error('Fehler beim Download:', error);
+                    alert('Fehler beim Herunterladen des Bildes. Versuchen Sie es mit einem anderen Bild oder laden Sie es direkt hoch.');
+                }
+            };
+            
+            img.onerror = () => {
+                alert('Fehler beim Laden des Bildes für den Download.');
+            };
+            
+            img.src = previewImg.src;
         }
-    </script>
-</body>
-</html>
