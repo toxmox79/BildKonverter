@@ -1,0 +1,372 @@
+<script type="text/javascript">
+        var gk_isXlsx = false;
+        var gk_xlsxFileLookup = {};
+        var gk_fileData = {};
+        function filledCell(cell) {
+          return cell !== '' && cell != null;
+        }
+        function loadFileData(filename) {
+        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
+            try {
+                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
+                var firstSheetName = workbook.SheetNames[0];
+                var worksheet = workbook.Sheets[firstSheetName];
+
+                // Convert sheet to JSON to filter blank rows
+                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
+                // Filter out blank rows (rows where all cells are empty, null, or undefined)
+                var filteredData = jsonData.filter(row => row.some(filledCell));
+
+                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
+                var headerRowIndex = filteredData.findIndex((row, index) =>
+                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
+                );
+                // Fallback
+                if (headerRowIndex === -1 || headerRowIndex > 25) {
+                  headerRowIndex = 0;
+                }
+
+                // Convert filtered JSON back to CSV
+                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
+                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
+                return csv;
+            } catch (e) {
+                console.error(e);
+                return "";
+            }
+        }
+        return gk_fileData[filename] || "";
+        }
+        </script><!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#93c01f">
+    <meta name="description" content="Konvertieren Sie Ihre Bilder zu JPG mit 1600x1600 Pixeln">
+    <link rel="manifest" href="manifest.json">
+    <title>Bild Konverter PWA</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'San Francisco', 'Helvetica Neue', sans-serif;
+            background-color: #f5f5f7;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+            width: 90%;
+            max-width: 600px;
+            padding: 20px;
+            text-align: center;
+        }
+        .header {
+            color: #1d1d1f;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        .drop-zone {
+            background: #e3e3e5;
+            border: 2px dashed #d2d2d7;
+            border-radius: 10px;
+            padding: 40px 20px;
+            margin-bottom: 20px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        .drop-zone.dragover {
+            background: #d2d2d7;
+        }
+        .preview {
+            border: 1px solid #d2d2d7;
+            border-radius: 10px;
+            padding: 10px;
+            background: #f5f5f7;
+            position: relative;
+            width: 400px;
+            height: 400px;
+            overflow: hidden;
+            margin: 0 auto;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        .preview img {
+            position: absolute;
+            top: 0;
+            left: 0;
+            transform-origin: 0 0;
+            max-width: none;
+            max-height: none;
+        }
+        .controls {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        button {
+            background: #93c01f;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #7ea219;
+        }
+        .info {
+            font-size: 12px;
+            color: #6e6e73;
+            margin-top: 10px;
+        }
+        .slider-container {
+            margin: 10px 0;
+        }
+        .slider {
+            width: 100%;
+            appearance: none;
+            height: 10px;
+            background: #d2d2d7;
+            outline: none;
+            opacity: 0.7;
+            transition: opacity 0.2s;
+        }
+        .slider:hover {
+            opacity: 1;
+        }
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #93c01f;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #93c01f;
+            cursor: pointer;
+            border-radius: 50%;
+        }
+        .url-input {
+            margin-bottom: 10px;
+        }
+        .url-input input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #d2d2d7;
+            border-radius: 10px;
+            box-sizing: border-box;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">🎨 Bild Konverter PWA</div>
+        <div class="info">Konvertieren Sie Ihre Bilder zu JPG mit 1600x1600 Pixeln</div>
+        <div class="url-input">
+            <input type="text" id="imageUrl" placeholder="Bild-URL einfügen" style="display: block;">
+            <button onclick="loadFromUrl()">URL laden</button>
+        </div>
+        <div class="drop-zone" id="dropZone">
+            <input type="file" id="fileInput" accept="image/*" style="display: none;">
+            <label for="fileInput" class="drop-zone-label">📸 Bild auswählen oder hier ablegen</label>
+        </div>
+        <div class="preview" id="preview">
+            <img id="previewImg" src="" alt="Vorschau">
+        </div>
+        <div class="controls">
+            <div class="slider-container">
+                <input type="range" id="zoomSlider" min="0.1" max="10" step="0.1" value="1" class="slider">
+            </div>
+            <button onclick="resetView()">🔄 Zurücksetzen</button>
+            <button onclick="deleteImage()">🗑️ Bild löschen</button>
+            <button onclick="downloadImage()">💾 Als JPG herunterladen</button>
+        </div>
+        <div class="info">
+            Original Format: <span id="origFormat">-</span><br>
+            Original Größe: <span id="origSize">-</span><br>
+            Aktueller Zoom: <span id="zoomLevel">100%</span>
+        </div>
+    </div>
+
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('service-worker.js')
+                .then(() => console.log('Service Worker registered'))
+                .catch(err => console.error('Service Worker registration failed:', err));
+        }
+
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const previewImg = document.getElementById('previewImg');
+        const zoomSlider = document.getElementById('zoomSlider');
+        const imageUrlInput = document.getElementById('imageUrl');
+        let scale = 1;
+        let posX = 0;
+        let posY = 0;
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+
+        dropZone.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFiles(files);
+            } else {
+                const url = e.dataTransfer.getData('text/html').match(/src="([^"]+)"/);
+                if (url && url[1]) {
+                    loadImageFromUrl(url[1]);
+                }
+            }
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            handleFiles(e.target.files);
+        });
+
+        function handleFiles(files) {
+            if (files.length > 0) {
+                const file = files[0];
+                if (file && file.type.startsWith('image/')) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        previewImg.src = e.target.result;
+                        previewImg.style.display = 'block';
+                        const img = new Image();
+                        img.onload = () => {
+                            document.getElementById('origFormat').textContent = file.type.split('/')[1].toUpperCase();
+                            document.getElementById('origSize').textContent = `${img.width} × ${img.height} px`;
+                            const preview = document.getElementById('preview');
+                            const previewWidth = preview.offsetWidth;
+                            const previewHeight = preview.offsetHeight;
+                            scale = Math.min(previewWidth / img.width, previewHeight / img.height);
+                            posX = (previewWidth - img.width * scale) / 2;
+                            posY = (previewHeight - img.height * scale) / 2;
+                            updateTransform();
+                            zoomSlider.value = scale;
+                            document.getElementById('zoomLevel').textContent = `${(scale * 100).toFixed(0)}%`;
+                        };
+                        img.src = e.target.result;
+                    };
+                    reader.readAsDataURL(file);
+                }
+            }
+        }
+
+        function loadFromUrl() {
+            const url = imageUrlInput.value.trim();
+            if (url) {
+                loadImageFromUrl(url);
+            }
+        }
+
+        function loadImageFromUrl(url) {
+            previewImg.src = url;
+            previewImg.style.display = 'block';
+            const img = new Image();
+            img.onload = () => {
+                document.getElementById('origFormat').textContent = url.split('.').pop().toUpperCase();
+                document.getElementById('origSize').textContent = `${img.width} × ${img.height} px`;
+                const preview = document.getElementById('preview');
+                const previewWidth = preview.offsetWidth;
+                const previewHeight = preview.offsetHeight;
+                scale = Math.min(previewWidth / img.width, previewHeight / img.height);
+                posX = (previewWidth - img.width * scale) / 2;
+                posY = (previewHeight - img.height * scale) / 2;
+                updateTransform();
+                zoomSlider.value = scale;
+                document.getElementById('zoomLevel').textContent = `${(scale * 100).toFixed(0)}%`;
+            };
+            img.src = url;
+        }
+
+        function resetView() {
+            scale = 1;
+            posX = 0;
+            posY = 0;
+            updateTransform();
+            zoomSlider.value = scale;
+            document.getElementById('zoomLevel').textContent = '100%';
+        }
+
+        function updateTransform() {
+            previewImg.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+        }
+
+        function deleteImage() {
+            previewImg.src = '';
+            previewImg.style.display = 'none';
+            document.getElementById('origFormat').textContent = '-';
+            document.getElementById('origSize').textContent = '-';
+            document.getElementById('zoomLevel').textContent = '100%';
+            scale = 1;
+            posX = 0;
+            posY = 0;
+            updateTransform();
+            zoomSlider.value = scale;
+        }
+
+        zoomSlider.addEventListener('input', (e) => {
+            scale = parseFloat(e.target.value);
+            updateTransform();
+            document.getElementById('zoomLevel').textContent = `${(scale * 100).toFixed(0)}%`;
+        });
+
+        previewImg.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX - posX;
+            startY = e.clientY - posY;
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (isDragging) {
+                posX = e.clientX - startX;
+                posY = e.clientY - startY;
+                updateTransform();
+            }
+        });
+
+        document.addEventListener('mouseup', () => {
+            isDragging = false;
+        });
+
+        function downloadImage() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 1600;
+            canvas.height = 1600;
+            const ctx = canvas.getContext('2d');
+            const previewRect = document.getElementById('preview').getBoundingClientRect();
+            ctx.drawImage(previewImg, -posX * (1600 / previewRect.width) / scale, -posY * (1600 / previewRect.height) / scale, 1600 / scale, 1600 / scale);
+            const link = document.createElement('a');
+            link.download = `converted_image.jpg`;
+            link.href = canvas.toDataURL('image/jpeg');
+            link.click();
+        }
+    </script>
+</body>
+</html>

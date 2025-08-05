@@ -1,0 +1,77 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="backgroundGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#667eea;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#764ba2;stop-opacity:1" />
+    </linearGradient>
+    
+    <linearGradient id="iconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#4285F4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#34A853;stop-opacity:1" />
+    </linearGradient>
+    
+    <filter id="shadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="rgba(0,0,0,0.3)"/>
+    </filter>
+    
+    <filter id="innerShadow" x="-50%" y="-50%" width="200%" height="200%">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-color="rgba(0,0,0,0.2)"/>
+    </filter>
+  </defs>
+  
+  <!-- Background with rounded corners -->
+  <rect width="512" height="512" rx="100" ry="100" fill="url(#backgroundGradient)"/>
+  
+  <!-- Main container background -->
+  <rect x="64" y="80" width="384" height="352" rx="32" ry="32" fill="rgba(255,255,255,0.95)" filter="url(#shadow)"/>
+  
+  <!-- Image placeholder background -->
+  <rect x="96" y="112" width="160" height="120" rx="16" ry="16" fill="#f8f9fa" stroke="#e9ecef" stroke-width="2"/>
+  
+  <!-- Checkerboard pattern in image placeholder -->
+  <pattern id="checkerboard" patternUnits="userSpaceOnUse" width="16" height="16">
+    <rect width="8" height="8" fill="#f0f0f0"/>
+    <rect x="8" y="8" width="8" height="8" fill="#f0f0f0"/>
+    <rect x="8" y="0" width="8" height="8" fill="#e8e8e8"/>
+    <rect x="0" y="8" width="8" height="8" fill="#e8e8e8"/>
+  </pattern>
+  <rect x="98" y="114" width="156" height="116" fill="url(#checkerboard)" rx="14" ry="14"/>
+  
+  <!-- Sample image icon -->
+  <circle cx="130" cy="140" r="12" fill="url(#iconGradient)" opacity="0.8"/>
+  <path d="M110 180 L140 160 L170 180 L200 160 L230 180 L230 210 L110 210 Z" fill="url(#iconGradient)" opacity="0.6"/>
+  
+  <!-- Arrow indicating conversion -->
+  <path d="M280 160 L320 160 M310 150 L320 160 L310 170" stroke="url(#iconGradient)" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  
+  <!-- Output preview -->
+  <rect x="336" y="112" width="112" height="112" rx="16" ry="16" fill="white" stroke="url(#iconGradient)" stroke-width="3" filter="url(#innerShadow)"/>
+  
+  <!-- 1600x1600 indicator -->
+  <text x="392" y="145" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="url(#iconGradient)">1600</text>
+  <text x="392" y="158" text-anchor="middle" font-family="Arial, sans-serif" font-size="8" fill="#666">×</text>
+  <text x="392" y="172" text-anchor="middle" font-family="Arial, sans-serif" font-size="11" font-weight="bold" fill="url(#iconGradient)">1600</text>
+  
+  <!-- JPG indicator -->
+  <rect x="350" y="200" width="84" height="20" rx="10" ry="10" fill="url(#iconGradient)"/>
+  <text x="392" y="213" text-anchor="middle" font-family="Arial, sans-serif" font-size="12" font-weight="bold" fill="white">JPG</text>
+  
+  <!-- Control elements -->
+  <circle cx="120" cy="280" r="8" fill="url(#iconGradient)" opacity="0.7"/>
+  <circle cx="150" cy="280" r="8" fill="url(#iconGradient)" opacity="0.7"/>
+  <circle cx="180" cy="280" r="8" fill="url(#iconGradient)" opacity="0.7"/>
+  
+  <!-- Zoom slider representation -->
+  <rect x="220" y="275" width="120" height="10" rx="5" ry="5" fill="#e9ecef"/>
+  <rect x="270" y="277" width="20" height="6" rx="3" ry="3" fill="url(#iconGradient)"/>
+  
+  <!-- Download icon -->
+  <rect x="380" y="265" width="40" height="30" rx="8" ry="8" fill="url(#iconGradient)" opacity="0.8"/>
+  <path d="M395 275 L395 285 M390 280 L395 285 L400 280" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <rect x="385" y="290" width="30" height="2" rx="1" ry="1" fill="white"/>
+  
+  <!-- Decorative elements -->
+  <circle cx="420" cy="140" r="3" fill="rgba(255,255,255,0.6)"/>
+  <circle cx="410" cy="350" r="4" fill="rgba(255,255,255,0.4)"/>
+  <circle cx="100" cy="360" r="2" fill="rgba(255,255,255,0.5)"/>
+</svg>
