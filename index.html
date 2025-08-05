@@ -208,6 +208,7 @@
 
         fileInput.addEventListener('change', (e) => {
             handleFiles(e.target.files);
+            fileInput.value = ''; // Zurücksetzen, damit erneutes Auswählen desselben Bildes funktioniert
         });
 
         function handleFiles(files) {
