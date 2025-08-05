@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="de" manifest="/cache.manifest">
+<html lang="de">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Bild Konverter PWA zum Konvertieren von Bildern zu JPG mit 1600x1600 Pixeln">
-    <meta name="theme-color" content="#f5f5f7">
+    <meta name="theme-color" content="#93c01f">
+    <meta name="description" content="Konvertiere Bilder zu JPG mit 1600x1600 Pixeln">
     <link rel="manifest" href="/manifest.json">
     <link rel="apple-touch-icon" href="/icon.png">
     <title>Bild Konverter PWA</title>
@@ -210,7 +210,6 @@
             handleFiles(e.target.files);
         });
 
-        // Clipboard Paste Handling
         document.addEventListener('paste', (e) => {
             const items = (e.clipboardData || window.clipboardData).items;
             if (!items) {
