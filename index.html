@@ -246,24 +246,33 @@
             }
         }
 
-        function loadImageFromUrl(url) {
-            previewImg.src = url;
-            previewImg.style.display = 'block';
-            const img = new Image();
-            img.onload = () => {
-                document.getElementById('origFormat').textContent = url.split('.').pop().toUpperCase();
-                document.getElementById('origSize').textContent = `${img.width} × ${img.height} px`;
-                const preview = document.getElementById('preview');
-                const previewWidth = preview.offsetWidth;
-                const previewHeight = preview.offsetHeight;
-                scale = Math.min(previewWidth / img.width, previewHeight / img.height);
-                posX = (previewWidth - img.width * scale) / 2;
-                posY = (previewHeight - img.height * scale) / 2;
-                updateTransform();
-                zoomSlider.value = scale;
-                document.getElementById('zoomLevel').textContent = `${(scale * 100).toFixed(0)}%`;
-            };
-            img.src = url;
+        async function loadImageFromUrl(url) {
+            try {
+                const response = await fetch(url, { mode: 'cors' });
+                if (!response.ok) throw new Error("Fehler beim Laden des Bildes.");
+                const blob = await response.blob();
+                const objectUrl = URL.createObjectURL(blob);
+                previewImg.src = objectUrl;
+                previewImg.style.display = 'block';
+                const img = new Image();
+                img.onload = () => {
+                    document.getElementById('origFormat').textContent = blob.type.split('/')[1].toUpperCase();
+                    document.getElementById('origSize').textContent = `${img.width} × ${img.height} px`;
+                    const preview = document.getElementById('preview');
+                    const previewWidth = preview.offsetWidth;
+                    const previewHeight = preview.offsetHeight;
+                    scale = Math.min(previewWidth / img.width, previewHeight / img.height);
+                    posX = (previewWidth - img.width * scale) / 2;
+                    posY = (previewHeight - img.height * scale) / 2;
+                    updateTransform();
+                    zoomSlider.value = scale;
+                    document.getElementById('zoomLevel').textContent = `${(scale * 100).toFixed(0)}%`;
+                };
+                img.src = objectUrl;
+            } catch (err) {
+                alert("Fehler beim Laden des Bildes über URL. Es ist möglicherweise durch CORS geschützt.");
+                console.error(err);
+            }
         }
 
         function resetView() {
@@ -409,12 +418,14 @@
         }
 
 </script>
-    <script>
+
+<script>
 if ('serviceWorker' in navigator) {
   navigator.serviceWorker.register('service-worker.js')
     .then(() => console.log('✅ Service Worker registriert'))
     .catch(err => console.error('❌ Service Worker konnte nicht registriert werden:', err));
 }
 </script>
+
 </body>
 </html>
