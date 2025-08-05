@@ -1,50 +1,12 @@
-<script type="text/javascript">
-        var gk_isXlsx = false;
-        var gk_xlsxFileLookup = {};
-        var gk_fileData = {};
-        function filledCell(cell) {
-          return cell !== '' && cell != null;
-        }
-        function loadFileData(filename) {
-        if (gk_isXlsx && gk_xlsxFileLookup[filename]) {
-            try {
-                var workbook = XLSX.read(gk_fileData[filename], { type: 'base64' });
-                var firstSheetName = workbook.SheetNames[0];
-                var worksheet = workbook.Sheets[firstSheetName];
-
-                // Convert sheet to JSON to filter blank rows
-                var jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1, blankrows: false, defval: '' });
-                // Filter out blank rows (rows where all cells are empty, null, or undefined)
-                var filteredData = jsonData.filter(row => row.some(filledCell));
-
-                // Heuristic to find the header row by ignoring rows with fewer filled cells than the next row
-                var headerRowIndex = filteredData.findIndex((row, index) =>
-                  row.filter(filledCell).length >= filteredData[index + 1]?.filter(filledCell).length
-                );
-                // Fallback
-                if (headerRowIndex === -1 || headerRowIndex > 25) {
-                  headerRowIndex = 0;
-                }
-
-                // Convert filtered JSON back to CSV
-                var csv = XLSX.utils.aoa_to_sheet(filteredData.slice(headerRowIndex)); // Create a new sheet from filtered array of arrays
-                csv = XLSX.utils.sheet_to_csv(csv, { header: 1 });
-                return csv;
-            } catch (e) {
-                console.error(e);
-                return "";
-            }
-        }
-        return gk_fileData[filename] || "";
-        }
-        </script><!DOCTYPE html>
-<html lang="de">
+<!DOCTYPE html>
+<html lang="de" manifest="/cache.manifest">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#93c01f">
-    <meta name="description" content="Konvertieren Sie Ihre Bilder zu JPG mit 1600x1600 Pixeln">
-    <link rel="manifest" href="manifest.json">
+    <meta name="description" content="Bild Konverter PWA zum Konvertieren von Bildern zu JPG mit 1600x1600 Pixeln">
+    <meta name="theme-color" content="#f5f5f7">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="apple-touch-icon" href="/icon.png">
     <title>Bild Konverter PWA</title>
     <style>
         body {
@@ -173,12 +135,12 @@
 <body>
     <div class="container">
         <div class="header">🎨 Bild Konverter PWA</div>
-        <div class="info">Konvertieren Sie Ihre Bilder zu JPG mit 1600x1600 Pixeln</div>
+        <div class="info">Konvertieren Sie Ihre Bilder zu JPG mit 1600x1600 Pixeln (Einfügen aus Zwischenablage möglich)</div>
         <div class="url-input">
             <input type="text" id="imageUrl" placeholder="Bild-URL einfügen" style="display: block;">
             <button onclick="loadFromUrl()">URL laden</button>
         </div>
-        <div class="drop-zone" id="dropZone">
+        <div class="drop-zone" id="dropZone" contenteditable="true">
             <input type="file" id="fileInput" accept="image/*" style="display: none;">
             <label for="fileInput" class="drop-zone-label">📸 Bild auswählen oder hier ablegen</label>
         </div>
@@ -202,7 +164,7 @@
 
     <script>
         if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js')
+            navigator.serviceWorker.register('/service-worker.js')
                 .then(() => console.log('Service Worker registered'))
                 .catch(err => console.error('Service Worker registration failed:', err));
         }
@@ -246,6 +208,43 @@
 
         fileInput.addEventListener('change', (e) => {
             handleFiles(e.target.files);
+        });
+
+        // Clipboard Paste Handling
+        document.addEventListener('paste', (e) => {
+            const items = (e.clipboardData || window.clipboardData).items;
+            if (!items) {
+                alert('Zwischenablage-Funktion wird von Ihrem Browser nicht unterstützt.');
+                return;
+            }
+            for (let i = 0; i < items.length; i++) {
+                if (items[i].type.indexOf('image') === 0) {
+                    e.preventDefault();
+                    const blob = items[i].getAsFile();
+                    const reader = new FileReader();
+                    reader.onload = (event) => {
+                        previewImg.src = event.target.result;
+                        previewImg.style.display = 'block';
+                        const img = new Image();
+                        img.onload = () => {
+                            document.getElementById('origFormat').textContent = blob.type.split('/')[1].toUpperCase();
+                            document.getElementById('origSize').textContent = `${img.width} × ${img.height} px`;
+                            const preview = document.getElementById('preview');
+                            const previewWidth = preview.offsetWidth;
+                            const previewHeight = preview.offsetHeight;
+                            scale = Math.min(previewWidth / img.width, previewHeight / img.height);
+                            posX = (previewWidth - img.width * scale) / 2;
+                            posY = (previewHeight - img.height * scale) / 2;
+                            updateTransform();
+                            zoomSlider.value = scale;
+                            document.getElementById('zoomLevel').textContent = `${(scale * 100).toFixed(0)}%`;
+                        };
+                        img.src = event.target.result;
+                    };
+                    reader.readAsDataURL(blob);
+                    break;
+                }
+            }
         });
 
         function handleFiles(files) {
