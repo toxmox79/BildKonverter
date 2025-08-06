@@ -124,12 +124,18 @@
         }
 
         function downloadImage() {
-            const canvas = document.createElement("canvas");
-            canvas.width = 1600;
-            canvas.height = 1600;
-            const ctx = canvas.getContext("2d");
             const preview = document.getElementById("preview");
-            ctx.drawImage(previewImg, -posX * (1600 / preview.offsetWidth) / scale, -posY * (1600 / preview.offsetHeight) / scale, 1600 / scale, 1600 / scale);
+            const canvas = document.createElement("canvas");
+            canvas.width = preview.offsetWidth;
+            canvas.height = preview.offsetHeight;
+            const ctx = canvas.getContext("2d");
+            ctx.drawImage(
+                previewImg,
+                posX / scale * -1,
+                posY / scale * -1,
+                previewImg.naturalWidth,
+                previewImg.naturalHeight
+            );
             const link = document.createElement("a");
             link.download = "converted_image.jpg";
             link.href = canvas.toDataURL("image/jpeg");
