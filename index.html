@@ -124,21 +124,41 @@
         }
 
         function downloadImage() {
-    const preview = document.getElementById("preview");
-    const canvas = document.createElement("canvas");
-    canvas.width = preview.offsetWidth;
-    canvas.height = preview.offsetHeight;
-    const ctx = canvas.getContext("2d");
+            const canvas = document.createElement("canvas");
+            canvas.width = 1600;
+            canvas.height = 1600;
+            const ctx = canvas.getContext("2d");
 
-    // Setze dieselbe Transformation wie bei der Vorschau
-    ctx.setTransform(scale, 0, 0, scale, posX, posY);
-    ctx.drawImage(previewImg, 0, 0);
+            const preview = document.getElementById("preview");
+            const previewWidth = preview.offsetWidth;
+            const previewHeight = preview.offsetHeight;
 
-    const link = document.createElement("a");
-    link.download = "converted_image.jpg";
-    link.href = canvas.toDataURL("image/jpeg");
-    link.click();
-}
+            // Umrechnungsfaktor zwischen Vorschau und Export
+            const scaleFactor = 1600 / previewWidth;
+
+            // Bereich des Bildes berechnen, der in der Vorschau sichtbar ist
+            const sx = -posX / scale;
+            const sy = -posY / scale;
+            const sWidth = previewWidth / scale;
+            const sHeight = previewHeight / scale;
+
+            ctx.drawImage(
+                previewImg,
+                sx,
+                sy,
+                sWidth,
+                sHeight,
+                0,
+                0,
+                1600,
+                1600
+            );
+
+            const link = document.createElement("a");
+            link.download = "converted_image.png";
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+        }
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('service-worker.js')
