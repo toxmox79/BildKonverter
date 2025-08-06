@@ -124,23 +124,21 @@
         }
 
         function downloadImage() {
-            const preview = document.getElementById("preview");
-            const canvas = document.createElement("canvas");
-            canvas.width = preview.offsetWidth;
-            canvas.height = preview.offsetHeight;
-            const ctx = canvas.getContext("2d");
-            ctx.drawImage(
-                previewImg,
-                posX / scale * -1,
-                posY / scale * -1,
-                previewImg.naturalWidth,
-                previewImg.naturalHeight
-            );
-            const link = document.createElement("a");
-            link.download = "converted_image.jpg";
-            link.href = canvas.toDataURL("image/jpeg");
-            link.click();
-        }
+    const preview = document.getElementById("preview");
+    const canvas = document.createElement("canvas");
+    canvas.width = preview.offsetWidth;
+    canvas.height = preview.offsetHeight;
+    const ctx = canvas.getContext("2d");
+
+    // Setze dieselbe Transformation wie bei der Vorschau
+    ctx.setTransform(scale, 0, 0, scale, posX, posY);
+    ctx.drawImage(previewImg, 0, 0);
+
+    const link = document.createElement("a");
+    link.download = "converted_image.jpg";
+    link.href = canvas.toDataURL("image/jpeg");
+    link.click();
+}
 
         if ('serviceWorker' in navigator) {
             navigator.serviceWorker.register('service-worker.js')
