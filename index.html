@@ -59,6 +59,7 @@
                     updateTransform();
                     zoomSlider.value = scale;
                     updateZoomLabel();
+                    centerImage(preview.offsetWidth, preview.offsetHeight, previewImg.naturalWidth, previewImg.naturalHeight);
                 };
             } catch (err) {
                 alert("Fehler beim Laden über CORS-Proxy.");
@@ -83,6 +84,7 @@
                             updateTransform();
                             zoomSlider.value = scale;
                             updateZoomLabel();
+                            centerImage(preview.offsetWidth, preview.offsetHeight, previewImg.naturalWidth, previewImg.naturalHeight);
                         };
                         return;
                     }
@@ -139,6 +141,39 @@
                 .then(() => console.log('✅ Service Worker registriert'))
                 .catch(err => console.error('❌ Fehler beim Registrieren:', err));
         }
-    </script>
+    
+        let isDragging = false;
+        let startX = 0;
+        let startY = 0;
+
+        previewImg.addEventListener("mousedown", (e) => {
+            isDragging = true;
+            startX = e.clientX - posX;
+            startY = e.clientY - posY;
+            e.preventDefault();
+        });
+
+        document.addEventListener("mousemove", (e) => {
+            if (isDragging) {
+                posX = e.clientX - startX;
+                posY = e.clientY - startY;
+                updateTransform();
+            }
+        });
+
+        document.addEventListener("mouseup", () => {
+            isDragging = false;
+        });
+
+        function centerImage(previewW, previewH, imageW, imageH) {
+            scale = Math.min(previewW / imageW, previewH / imageH);
+            posX = (previewW - imageW * scale) / 2;
+            posY = (previewH - imageH * scale) / 2;
+            updateTransform();
+            zoomSlider.value = scale;
+            updateZoomLabel();
+        }
+
+</script>
 </body>
 </html>
