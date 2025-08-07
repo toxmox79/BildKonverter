@@ -2,202 +2,143 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Bild Konverter</title>
-    <link rel="manifest" href="manifest.json" />
-    <style>
-        body { font-family: sans-serif; text-align: center; background: #f5f5f5; }
-        .container { max-width: 600px; margin: 50px auto; background: white; padding: 20px; border-radius: 10px; }
-        .preview { width: 400px; height: 400px; border: 1px solid #ccc; margin: 10px auto; overflow: hidden; position: relative; }
-        .preview img { position: absolute; top: 0; left: 0; transform-origin: 0 0; max-width: none; max-height: none; }
-        input[type="range"] { width: 100%; }
-        button { margin: 5px; padding: 10px 15px; background: #93c01f; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        input[type="text"] { width: 100%; padding: 10px; margin-bottom: 10px; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bild Konverter</title>
+  <link rel="manifest" href="manifest.json" />
+  <style>
+    body { font-family: sans-serif; background: #f5f5f5; text-align: center; }
+    .container { background: white; max-width: 600px; margin: 40px auto; padding: 20px; border-radius: 10px; }
+    .preview { width: 400px; height: 400px; border: 1px solid #ccc; margin: 10px auto; overflow: hidden; position: relative; }
+    .preview img { position: absolute; top: 0; left: 0; transform-origin: 0 0; max-width: none; max-height: none; }
+    input[type=range], input[type=text], input[type=file], button { margin: 10px 0; padding: 10px; width: 100%; max-width: 300px; }
+    button { background: #93c01f; color: white; border: none; border-radius: 5px; cursor: pointer; }
+  </style>
 </head>
 <body>
-    <div class="container">
-        <h1>Bild Konverter</h1>
-        <input type="text" id="imageUrl" placeholder="Bild-URL einfügen" />
-        <button onclick="loadFromUrl()">URL laden</button>
-        <button onclick="pasteFromClipboard()">📋 Aus Zwischenablage</button>
-        <div class="preview" id="preview"><img id="previewImg" /></div>
-        <input type="range" id="zoomSlider" min="0.1" max="10" step="0.01" value="1" />
-        <div>
-            <button onclick="resetView()">🔄 Zurücksetzen</button>
-            <button onclick="deleteImage()">🗑️ Löschen</button>
-            <button onclick="downloadImage()">💾 Herunterladen</button>
-        </div>
-        <p id="zoomLevel">Zoom: 100%</p>
-        <p>Original Format: <span id="origFormat">-</span><br />Größe: <span id="origSize">-</span></p>
-    </div>
-    <script>
-        const previewImg = document.getElementById("previewImg");
-        const zoomSlider = document.getElementById("zoomSlider");
-        const imageUrlInput = document.getElementById("imageUrl");
-        let scale = 1, posX = 0, posY = 0;
+  <div class="container">
+    <h1>Bild Konverter</h1>
+    <input type="text" id="imageUrl" placeholder="Bild-URL einfügen" />
+    <button onclick="loadFromUrl()">🌐 URL laden</button>
+    <button onclick="pasteFromClipboard()">📋 Aus Zwischenablage</button>
+    <input type="file" id="fileInput" accept="image/*" />
+    <div class="preview" id="preview"><img id="previewImg" /></div>
+    <input type="range" id="zoomSlider" min="0.1" max="10" step="0.01" value="1" />
+    <button onclick="resetView()">🔄 Zurücksetzen</button>
+    <button onclick="deleteImage()">🗑️ Löschen</button>
+    <button onclick="downloadImage()">💾 Als PNG herunterladen</button>
+    <p id="zoomLevel">Zoom: 100%</p>
+    <p>Original Format: <span id="origFormat">-</span><br />Größe: <span id="origSize">-</span></p>
+  </div>
+  <script>
+    const previewImg = document.getElementById("previewImg");
+    const zoomSlider = document.getElementById("zoomSlider");
+    const imageUrlInput = document.getElementById("imageUrl");
+    let scale = 1, posX = 0, posY = 0, isDragging = false, startX = 0, startY = 0;
 
-        async function loadFromUrl() {
-            const originalUrl = imageUrlInput.value.trim();
-            if (!originalUrl) return;
-            const corsProxy = "https://corsproxy.io/?";
-            const proxiedUrl = corsProxy + encodeURIComponent(originalUrl);
-            try {
-                const response = await fetch(proxiedUrl);
-                if (!response.ok) throw new Error("Fehler beim Laden");
-                const blob = await response.blob();
-                const objectUrl = URL.createObjectURL(blob);
-                previewImg.src = objectUrl;
-                previewImg.onload = () => {
-                    document.getElementById("origFormat").textContent = blob.type.split("/")[1].toUpperCase();
-                    document.getElementById("origSize").textContent = previewImg.naturalWidth + " × " + previewImg.naturalHeight + " px";
-                    const preview = document.getElementById("preview");
-                    scale = Math.min(preview.offsetWidth / previewImg.naturalWidth, preview.offsetHeight / previewImg.naturalHeight);
-                    posX = (preview.offsetWidth - previewImg.naturalWidth * scale) / 2;
-                    posY = (preview.offsetHeight - previewImg.naturalHeight * scale) / 2;
-                    updateTransform();
-                    zoomSlider.value = scale;
-                    updateZoomLabel();
-                    centerImage(preview.offsetWidth, preview.offsetHeight, previewImg.naturalWidth, previewImg.naturalHeight);
-                };
-            } catch (err) {
-                alert("Fehler beim Laden über CORS-Proxy.");
-            }
+    function updateTransform() {
+      previewImg.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
+    }
+    function updateZoomLabel() {
+      document.getElementById("zoomLevel").textContent = "Zoom: " + Math.round(scale * 100) + "%";
+    }
+    function resetView() {
+      scale = 1; posX = 0; posY = 0;
+      updateTransform(); zoomSlider.value = 1;
+      updateZoomLabel();
+    }
+    function deleteImage() {
+      previewImg.src = "";
+      document.getElementById("origFormat").textContent = "-";
+      document.getElementById("origSize").textContent = "-";
+      resetView();
+    }
+    zoomSlider.addEventListener("input", () => {
+      scale = parseFloat(zoomSlider.value);
+      updateTransform(); updateZoomLabel();
+    });
+
+    previewImg.addEventListener("mousedown", (e) => {
+      isDragging = true; startX = e.clientX - posX; startY = e.clientY - posY; e.preventDefault();
+    });
+    document.addEventListener("mousemove", (e) => {
+      if (isDragging) {
+        posX = e.clientX - startX;
+        posY = e.clientY - startY;
+        updateTransform();
+      }
+    });
+    document.addEventListener("mouseup", () => { isDragging = false; });
+
+    async function loadFromUrl() {
+      const url = imageUrlInput.value.trim();
+      const proxy = "https://corsproxy.io/?" + encodeURIComponent(url);
+      try {
+        const response = await fetch(proxy);
+        const blob = await response.blob();
+        const objectUrl = URL.createObjectURL(blob);
+        previewImg.src = objectUrl;
+        previewImg.onload = () => initImage(blob.type);
+      } catch (err) { alert("Fehler beim Laden."); }
+    }
+
+    async function pasteFromClipboard() {
+      try {
+        const items = await navigator.clipboard.read();
+        for (let item of items) {
+          if (item.types.includes('image/png') || item.types.includes('image/jpeg')) {
+            const blob = await item.getType(item.types[0]);
+            const url = URL.createObjectURL(blob);
+            previewImg.src = url;
+            previewImg.onload = () => initImage(blob.type);
+            return;
+          }
         }
+      } catch { alert("Zwischenablage-Zugriff nicht möglich."); }
+    }
 
-        async function pasteFromClipboard() {
-            try {
-                const items = await navigator.clipboard.read();
-                for (let item of items) {
-                    if (item.types.includes('image/png') || item.types.includes('image/jpeg')) {
-                        const blob = await item.getType(item.types[0]);
-                        const url = URL.createObjectURL(blob);
-                        previewImg.src = url;
-                        previewImg.onload = () => {
-                            document.getElementById("origFormat").textContent = blob.type.split("/")[1].toUpperCase();
-                            document.getElementById("origSize").textContent = previewImg.naturalWidth + " × " + previewImg.naturalHeight + " px";
-                            const preview = document.getElementById("preview");
-                            scale = Math.min(preview.offsetWidth / previewImg.naturalWidth, preview.offsetHeight / previewImg.naturalHeight);
-                            posX = (preview.offsetWidth - previewImg.naturalWidth * scale) / 2;
-                            posY = (preview.offsetHeight - previewImg.naturalHeight * scale) / 2;
-                            updateTransform();
-                            zoomSlider.value = scale;
-                            updateZoomLabel();
-                            centerImage(preview.offsetWidth, preview.offsetHeight, previewImg.naturalWidth, previewImg.naturalHeight);
-                        };
-                        return;
-                    }
-                }
-                alert("Kein Bild in der Zwischenablage.");
-            } catch {
-                alert("Clipboard-Zugriff nicht möglich.");
-            }
-        }
+    document.getElementById("fileInput").addEventListener("change", (e) => {
+      const file = e.target.files[0];
+      if (!file || !file.type.startsWith("image/")) return;
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        previewImg.src = event.target.result;
+        previewImg.onload = () => initImage(file.type);
+      };
+      reader.readAsDataURL(file);
+    });
 
-        zoomSlider.addEventListener("input", () => {
-            scale = parseFloat(zoomSlider.value);
-            updateTransform();
-            updateZoomLabel();
-        });
+    function initImage(type) {
+      document.getElementById("origFormat").textContent = type.split("/")[1].toUpperCase();
+      document.getElementById("origSize").textContent = previewImg.naturalWidth + " × " + previewImg.naturalHeight + " px";
+      const preview = document.getElementById("preview");
+      scale = Math.min(preview.offsetWidth / previewImg.naturalWidth, preview.offsetHeight / previewImg.naturalHeight);
+      posX = (preview.offsetWidth - previewImg.naturalWidth * scale) / 2;
+      posY = (preview.offsetHeight - previewImg.naturalHeight * scale) / 2;
+      updateTransform(); zoomSlider.value = scale;
+      updateZoomLabel();
+    }
 
-        function updateZoomLabel() {
-            document.getElementById("zoomLevel").textContent = "Zoom: " + Math.round(scale * 100) + "%";
-        }
+    function downloadImage() {
+      const canvas = document.createElement("canvas");
+      canvas.width = 1600;
+      canvas.height = 1600;
+      const ctx = canvas.getContext("2d");
+      const preview = document.getElementById("preview");
+      const sx = -posX / scale;
+      const sy = -posY / scale;
+      const sWidth = preview.offsetWidth / scale;
+      const sHeight = preview.offsetHeight / scale;
+      ctx.drawImage(previewImg, sx, sy, sWidth, sHeight, 0, 0, 1600, 1600);
+      const link = document.createElement("a");
+      link.download = "converted_image.png";
+      link.href = canvas.toDataURL("image/png");
+      link.click();
+    }
 
-        function resetView() {
-            scale = 1; posX = 0; posY = 0;
-            updateTransform();
-            zoomSlider.value = 1;
-            updateZoomLabel();
-        }
-
-        function deleteImage() {
-            previewImg.src = "";
-            document.getElementById("origFormat").textContent = "-";
-            document.getElementById("origSize").textContent = "-";
-            resetView();
-        }
-
-        function updateTransform() {
-            previewImg.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
-        }
-
-        function downloadImage() {
-            const canvas = document.createElement("canvas");
-            canvas.width = 1600;
-            canvas.height = 1600;
-            const ctx = canvas.getContext("2d");
-
-            const preview = document.getElementById("preview");
-            const previewWidth = preview.offsetWidth;
-            const previewHeight = preview.offsetHeight;
-
-            // Umrechnungsfaktor zwischen Vorschau und Export
-            const scaleFactor = 1600 / previewWidth;
-
-            // Bereich des Bildes berechnen, der in der Vorschau sichtbar ist
-            const sx = -posX / scale;
-            const sy = -posY / scale;
-            const sWidth = previewWidth / scale;
-            const sHeight = previewHeight / scale;
-
-            ctx.drawImage(
-                previewImg,
-                sx,
-                sy,
-                sWidth,
-                sHeight,
-                0,
-                0,
-                1600,
-                1600
-            );
-
-            const link = document.createElement("a");
-            link.download = "converted_image.png";
-            link.href = canvas.toDataURL("image/png");
-            link.click();
-        }
-
-        if ('serviceWorker' in navigator) {
-            navigator.serviceWorker.register('service-worker.js')
-                .then(() => console.log('✅ Service Worker registriert'))
-                .catch(err => console.error('❌ Fehler beim Registrieren:', err));
-        }
-    
-        let isDragging = false;
-        let startX = 0;
-        let startY = 0;
-
-        previewImg.addEventListener("mousedown", (e) => {
-            isDragging = true;
-            startX = e.clientX - posX;
-            startY = e.clientY - posY;
-            e.preventDefault();
-        });
-
-        document.addEventListener("mousemove", (e) => {
-            if (isDragging) {
-                posX = e.clientX - startX;
-                posY = e.clientY - startY;
-                updateTransform();
-            }
-        });
-
-        document.addEventListener("mouseup", () => {
-            isDragging = false;
-        });
-
-        function centerImage(previewW, previewH, imageW, imageH) {
-            scale = Math.min(previewW / imageW, previewH / imageH);
-            posX = (previewW - imageW * scale) / 2;
-            posY = (previewH - imageH * scale) / 2;
-            updateTransform();
-            zoomSlider.value = scale;
-            updateZoomLabel();
-        }
-
-</script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('service-worker.js');
+    }
+  </script>
 </body>
 </html>
