@@ -124,12 +124,18 @@
       canvas.width = 1600;
       canvas.height = 1600;
       const ctx = canvas.getContext("2d");
+
+      // Höchste Glättung aktivieren
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+
       const preview = document.getElementById("preview");
       const sx = -posX / scale;
       const sy = -posY / scale;
       const sWidth = preview.offsetWidth / scale;
       const sHeight = preview.offsetHeight / scale;
       ctx.drawImage(previewImg, sx, sy, sWidth, sHeight, 0, 0, 1600, 1600);
+
       const link = document.createElement("a");
       link.download = "converted_image.png";
       link.href = canvas.toDataURL("image/png");
