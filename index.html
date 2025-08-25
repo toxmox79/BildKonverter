@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -9,38 +8,56 @@
   <style>
     body { font-family: sans-serif; background: #f5f5f5; text-align: center; }
     .container { background: white; max-width: 600px; margin: 40px auto; padding: 20px; border-radius: 10px; }
-    .preview { width: 400px; height: 400px; border: 1px solid #ccc; margin: 10px auto; overflow: hidden; position: relative; }
+    .preview { width: 400px; height: 400px; border: 1px solid #ccc; margin: 10px auto; overflow: hidden; position: relative; background: #fff; }
     .preview img { position: absolute; top: 0; left: 0; transform-origin: 0 0; max-width: none; max-height: none; }
     input[type=range], input[type=text], input[type=file], button { margin: 10px 0; padding: 10px; width: 100%; max-width: 300px; }
     button { background: #93c01f; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    .row { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+    .row > * { flex: 1 1 280px; }
+    .hint { color:#555; font-size: 12px; margin-top: -6px; }
   </style>
 </head>
 <body>
   <div class="container">
     <h1>Bild Konverter</h1>
+
     <input type="text" id="imageUrl" placeholder="Bild-URL einfügen" />
     <button onclick="loadFromUrl()">🌐 URL laden</button>
     <button onclick="pasteFromClipboard()">📋 Aus Zwischenablage</button>
     <input type="file" id="fileInput" accept="image/*" />
-    <div class="preview" id="preview"><img id="previewImg" /></div>
-    <input type="range" id="zoomSlider" min="0.1" max="10" step="0.01" value="1" />
-    <button onclick="resetView()">🔄 Zurücksetzen</button>
-    <button onclick="deleteImage()">🗑️ Löschen</button>
+
+    <div class="preview" id="preview"><img id="previewImg" alt="Vorschau" /></div>
+
+    <input type="range" id="zoomSlider" min="0.05" max="20" step="0.001" value="1" />
+    <p class="hint">Tipp: Mit dem Mausrad in kleineren Schritten zentriert zoomen.</p>
+
+    <div class="row">
+      <button onclick="resetView()">🔄 Zurücksetzen</button>
+      <button onclick="deleteImage()">🗑️ Löschen</button>
+    </div>
+
+    <input type="text" id="imageName" placeholder="Dateiname ohne Endung (z. B. mein_bild)" />
     <button onclick="downloadImage()">💾 Als PNG herunterladen</button>
+
     <p id="zoomLevel">Zoom: 100%</p>
     <p>Original Format: <span id="origFormat">-</span><br />Größe: <span id="origSize">-</span></p>
   </div>
+
   <script>
+    const preview = document.getElementById("preview");
     const previewImg = document.getElementById("previewImg");
     const zoomSlider = document.getElementById("zoomSlider");
     const imageUrlInput = document.getElementById("imageUrl");
+    const imageNameInput = document.getElementById("imageName");
+
     let scale = 1, posX = 0, posY = 0, isDragging = false, startX = 0, startY = 0;
 
     function updateTransform() {
       previewImg.style.transform = `translate(${posX}px, ${posY}px) scale(${scale})`;
     }
     function updateZoomLabel() {
-      document.getElementById("zoomLevel").textContent = "Zoom: " + Math.round(scale * 100) + "%";
+      const pct = (scale * 100).toFixed(1).replace('.0','');
+      document.getElementById("zoomLevel").textContent = "Zoom: " + pct + "%";
     }
     function resetView() {
       scale = 1; posX = 0; posY = 0;
@@ -53,11 +70,42 @@
       document.getElementById("origSize").textContent = "-";
       resetView();
     }
+
+    // --- ZENTRIERTES ZOOMEN (Slider & Mausrad) ---
+    function zoomTo(newScale, focalX = preview.offsetWidth / 2, focalY = preview.offsetHeight / 2) {
+      const min = parseFloat(zoomSlider.min);
+      const max = parseFloat(zoomSlider.max);
+      newScale = Math.max(min, Math.min(max, newScale));
+
+      // Bildkoordinate unter dem Fokuspunkt vor der Skalierung berechnen
+      const imgX = (focalX - posX) / scale;
+      const imgY = (focalY - posY) / scale;
+
+      // Skalierung anwenden
+      scale = newScale;
+
+      // Neue Translation, damit derselbe Bildpunkt unter dem Fokus bleibt
+      posX = focalX - imgX * scale;
+      posY = focalY - imgY * scale;
+
+      updateTransform();
+      updateZoomLabel();
+      zoomSlider.value = scale;
+    }
+
     zoomSlider.addEventListener("input", () => {
-      scale = parseFloat(zoomSlider.value);
-      updateTransform(); updateZoomLabel();
+      // Beim Schieberegler zum ZENTRUM der Vorschau zoomen
+      zoomTo(parseFloat(zoomSlider.value));
     });
 
+    // Mausrad-Zoom in kleinen, präzisen Schritten (zentriert)
+    preview.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const factor = 1 - Math.sign(e.deltaY) * 0.05; // 5% pro Schritt
+      zoomTo(scale * factor);
+    }, { passive: false });
+
+    // Verschieben per Drag
     previewImg.addEventListener("mousedown", (e) => {
       isDragging = true; startX = e.clientX - posX; startY = e.clientY - posY; e.preventDefault();
     });
@@ -72,6 +120,7 @@
 
     async function loadFromUrl() {
       const url = imageUrlInput.value.trim();
+      if (!url) return;
       const proxy = "https://corsproxy.io/?" + encodeURIComponent(url);
       try {
         const response = await fetch(proxy);
@@ -104,18 +153,24 @@
       reader.onload = (event) => {
         previewImg.src = event.target.result;
         previewImg.onload = () => initImage(file.type);
+        // Dateinamenfeld automatisch füllen (ohne Endung)
+        const base = (file.name || "").replace(/\.[^.]+$/, "");
+        if (base) imageNameInput.value = base;
       };
       reader.readAsDataURL(file);
     });
 
     function initImage(type) {
-      document.getElementById("origFormat").textContent = type.split("/")[1].toUpperCase();
+      document.getElementById("origFormat").textContent = (type || "image/png").split("/")[1].toUpperCase();
       document.getElementById("origSize").textContent = previewImg.naturalWidth + " × " + previewImg.naturalHeight + " px";
-      const preview = document.getElementById("preview");
-      scale = Math.min(preview.offsetWidth / previewImg.naturalWidth, preview.offsetHeight / previewImg.naturalHeight);
+
+      // Bild passend einpassen und zentrieren
+      const fitScale = Math.min(preview.offsetWidth / previewImg.naturalWidth, preview.offsetHeight / previewImg.naturalHeight);
+      scale = fitScale;
       posX = (preview.offsetWidth - previewImg.naturalWidth * scale) / 2;
       posY = (preview.offsetHeight - previewImg.naturalHeight * scale) / 2;
-      updateTransform(); zoomSlider.value = scale;
+      updateTransform();
+      zoomSlider.value = scale;
       updateZoomLabel();
     }
 
@@ -129,15 +184,19 @@
       ctx.imageSmoothingEnabled = true;
       ctx.imageSmoothingQuality = "high";
 
-      const preview = document.getElementById("preview");
+      // Sichtbaren Bereich der Vorschau auf das Canvas mappen
       const sx = -posX / scale;
       const sy = -posY / scale;
       const sWidth = preview.offsetWidth / scale;
       const sHeight = preview.offsetHeight / scale;
       ctx.drawImage(previewImg, sx, sy, sWidth, sHeight, 0, 0, 1600, 1600);
 
+      // Dateinamen verwenden
+      const base = (imageNameInput.value || "converted_image").trim() || "converted_image";
+      const safeBase = base.replace(/[^a-zA-Z0-9_-]+/g, "_");
+
       const link = document.createElement("a");
-      link.download = "converted_image.png";
+      link.download = `${safeBase}.png`;
       link.href = canvas.toDataURL("image/png");
       link.click();
     }
