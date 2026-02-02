@@ -121,14 +121,26 @@
     async function loadFromUrl() {
       const url = imageUrlInput.value.trim();
       if (!url) return;
-      const proxy = "https://corsproxy.io/?" + encodeURIComponent(url);
+      const proxy = "https://cors.bridged.cc/" + url;
       try {
         const response = await fetch(proxy);
+        if (!response.ok) throw new Error("Fehler beim Laden vom Proxy");
         const blob = await response.blob();
         const objectUrl = URL.createObjectURL(blob);
         previewImg.src = objectUrl;
         previewImg.onload = () => initImage(blob.type);
-      } catch (err) { alert("Fehler beim Laden."); }
+      } catch (err) { 
+        // Fallback: Versuche direktes Laden (funktioniert bei manchen URLs)
+        try {
+          const response = await fetch(url);
+          const blob = await response.blob();
+          const objectUrl = URL.createObjectURL(blob);
+          previewImg.src = objectUrl;
+          previewImg.onload = () => initImage(blob.type);
+        } catch (err2) {
+          alert("Fehler beim Laden. Die URL könnte blockiert sein.");
+        }
+      }
     }
 
     async function pasteFromClipboard() {
