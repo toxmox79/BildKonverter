@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bild Konverter</title>
   <link rel="manifest" href="manifest.json" />
+  <link rel="icon" type="image/png" href="icons/icon-512.png" />
+  <link rel="apple-touch-icon" href="icons/icon-512.png" />
   <style>
     body { font-family: sans-serif; background: #f5f5f5; text-align: center; }
     .container { background: white; max-width: 600px; margin: 40px auto; padding: 20px; border-radius: 10px; }
@@ -121,25 +123,74 @@
     async function loadFromUrl() {
       const url = imageUrlInput.value.trim();
       if (!url) return;
-      const proxy = "https://cors.bridged.cc/" + url;
-      try {
-        const response = await fetch(proxy);
-        if (!response.ok) throw new Error("Fehler beim Laden vom Proxy");
-        const blob = await response.blob();
-        const objectUrl = URL.createObjectURL(blob);
-        previewImg.src = objectUrl;
-        previewImg.onload = () => initImage(blob.type);
-      } catch (err) { 
-        // Fallback: Versuche direktes Laden (funktioniert bei manchen URLs)
+      
+      console.log('Lade Bild von:', url);
+      
+      // Liste von CORS-Proxies zum Ausprobieren
+      const proxies = [
+        "https://corsproxy.io/?",
+        "https://thingproxy.freeboard.io/fetch/",
+        "https://api.allorigins.win/raw?url=",
+      ];
+      
+      let loaded = false;
+      
+      // Versuche mit Proxies
+      for (let proxy of proxies) {
+        if (loaded) break;
         try {
-          const response = await fetch(url);
-          const blob = await response.blob();
-          const objectUrl = URL.createObjectURL(blob);
-          previewImg.src = objectUrl;
-          previewImg.onload = () => initImage(blob.type);
-        } catch (err2) {
-          alert("Fehler beim Laden. Die URL könnte blockiert sein.");
+          const proxyUrl = proxy + encodeURIComponent(url);
+          console.log('Versuche Proxy:', proxy);
+          const response = await fetch(proxyUrl, {
+            mode: 'cors',
+            headers: {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            }
+          });
+          console.log('Proxy-Response:', response.status, response.headers.get('content-type'));
+          if (response.ok) {
+            const blob = await response.blob();
+            // Fallback MIME-Type wenn nicht erkannt
+            let mimeType = blob.type || 'image/jpeg';
+            if (!mimeType.startsWith('image/')) {
+              mimeType = 'image/jpeg';
+            }
+            const objectUrl = URL.createObjectURL(blob);
+            previewImg.src = objectUrl;
+            previewImg.onload = () => {
+              console.log('Bild geladen erfolgreich');
+              initImage(mimeType);
+            };
+            previewImg.onerror = () => {
+              console.error('Fehler beim Laden des Bildes vom Proxy');
+            };
+            loaded = true;
+            break;
+          }
+        } catch (err) {
+          console.warn(`Proxy ${proxy} fehlgeschlagen:`, err.message);
         }
+      }
+      
+      // Fallback: Versuche direktes Laden (funktioniert bei manchen URLs)
+      if (!loaded) {
+        try {
+          console.log('Versuche direktes Laden ohne Proxy');
+          const response = await fetch(url);
+          if (response.ok) {
+            const blob = await response.blob();
+            const objectUrl = URL.createObjectURL(blob);
+            previewImg.src = objectUrl;
+            previewImg.onload = () => initImage(blob.type);
+            loaded = true;
+          }
+        } catch (err) {
+          console.log("Direkter Zugriff fehlgeschlagen:", err.message);
+        }
+      }
+      
+      if (!loaded) {
+        alert("Fehler beim Laden. Die URL könnte blockiert sein oder der Server antwortet nicht.");
       }
     }
 
@@ -213,8 +264,10 @@
       link.click();
     }
 
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('service-worker.js');
+    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+      navigator.serviceWorker.register('service-worker.js').catch(err => {
+        console.log('Service Worker Registrierung fehlgeschlagen:', err.message);
+      });
     }
   </script>
 </body>
