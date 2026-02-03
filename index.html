@@ -5,8 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Bild Konverter</title>
   <link rel="manifest" href="manifest.json" />
-  <link rel="icon" type="image/png" href="icons/icon-512.png" />
-  <link rel="apple-touch-icon" href="icons/icon-512.png" />
   <style>
     body { font-family: sans-serif; background: #f5f5f5; text-align: center; }
     .container { background: white; max-width: 600px; margin: 40px auto; padding: 20px; border-radius: 10px; }
@@ -120,77 +118,131 @@
     });
     document.addEventListener("mouseup", () => { isDragging = false; });
 
+    // --- PROXY-MANAGEMENT ---
+    const PROXIES = [
+      "https://corsproxy.io/?",
+      "https://api.allorigins.win/raw?url=",
+      "https://cors.bridged.cc/",
+      "https://api.codetabs.com/v1/proxy?quest=",
+    ];
+
+    let workingProxy = localStorage.getItem("lastWorkingProxy");
+    let proxyTimeouts = new Map(); // Speichert fehlgeschlagene Proxys mit Timeout
+
+    async function testProxy(proxyUrl, imageUrl) {
+      let testUrl;
+      try {
+        // Verschiedene Proxys haben unterschiedliche URL-Formate
+        if (proxyUrl.includes('codetabs')) {
+          testUrl = proxyUrl + encodeURIComponent(imageUrl);
+        } else if (proxyUrl.includes('bridged')) {
+          testUrl = proxyUrl + encodeURIComponent(imageUrl);
+        } else {
+          testUrl = proxyUrl + encodeURIComponent(imageUrl);
+        }
+        
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000); // 10 Sekunden Timeout
+        
+        const response = await fetch(testUrl, {
+          signal: controller.signal,
+          mode: 'cors',
+          cache: 'no-cache',
+          headers: {
+            'Accept': 'image/*'
+          }
+        });
+        
+        clearTimeout(timeout);
+        
+        if (!response.ok) {
+          console.warn(`Proxy ${proxyUrl} antwortete mit Status ${response.status}`);
+          return null;
+        }
+        
+        const blob = await response.blob();
+        if (!blob.type.startsWith('image/') && blob.size > 0) {
+          console.warn(`Proxy ${proxyUrl} lieferte kein Bild: ${blob.type}`);
+          return null;
+        }
+        
+        return { blob, proxy: proxyUrl };
+      } catch (err) {
+        console.warn(`Proxy ${proxyUrl} fehlgeschlagen:`, err.message);
+        return null;
+      }
+    }
+
+    async function findWorkingProxy(imageUrl) {
+      // Sortiere Proxys: zuletzt funktionierender zuerst
+      let sortedProxies = [...PROXIES];
+      if (workingProxy && sortedProxies.includes(workingProxy)) {
+        sortedProxies = [workingProxy, ...sortedProxies.filter(p => p !== workingProxy)];
+      }
+
+      // Entferne temporär blockierte Proxys
+      const now = Date.now();
+      sortedProxies = sortedProxies.filter(proxy => {
+        const blockTime = proxyTimeouts.get(proxy);
+        if (blockTime && blockTime > now) return false;
+        return true;
+      });
+
+      // Versuche Proxys nacheinander
+      for (const proxy of sortedProxies) {
+        const result = await testProxy(proxy, imageUrl);
+        if (result) {
+          workingProxy = proxy;
+          localStorage.setItem("lastWorkingProxy", proxy);
+          // Setze kurzen Timeout für andere Proxys bei Erfolg
+          proxyTimeouts.delete(proxy);
+          return result;
+        } else {
+          // Blockiere diesen Proxy für 30 Sekunden
+          proxyTimeouts.set(proxy, now + 30000);
+        }
+      }
+
+      return null;
+    }
+
     async function loadFromUrl() {
       const url = imageUrlInput.value.trim();
-      if (!url) return;
-      
-      console.log('Lade Bild von:', url);
-      
-      // Liste von CORS-Proxies zum Ausprobieren
-      const proxies = [
-        "https://corsproxy.io/?",
-        "https://thingproxy.freeboard.io/fetch/",
-        "https://api.allorigins.win/raw?url=",
-      ];
-      
-      let loaded = false;
-      
-      // Versuche mit Proxies
-      for (let proxy of proxies) {
-        if (loaded) break;
-        try {
-          const proxyUrl = proxy + encodeURIComponent(url);
-          console.log('Versuche Proxy:', proxy);
-          const response = await fetch(proxyUrl, {
-            mode: 'cors',
-            headers: {
-              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-            }
-          });
-          console.log('Proxy-Response:', response.status, response.headers.get('content-type'));
-          if (response.ok) {
-            const blob = await response.blob();
-            // Fallback MIME-Type wenn nicht erkannt
-            let mimeType = blob.type || 'image/jpeg';
-            if (!mimeType.startsWith('image/')) {
-              mimeType = 'image/jpeg';
-            }
-            const objectUrl = URL.createObjectURL(blob);
-            previewImg.src = objectUrl;
-            previewImg.onload = () => {
-              console.log('Bild geladen erfolgreich');
-              initImage(mimeType);
-            };
-            previewImg.onerror = () => {
-              console.error('Fehler beim Laden des Bildes vom Proxy');
-            };
-            loaded = true;
-            break;
-          }
-        } catch (err) {
-          console.warn(`Proxy ${proxy} fehlgeschlagen:`, err.message);
-        }
+      if (!url) {
+        alert("Bitte geben Sie eine URL ein.");
+        return;
       }
-      
-      // Fallback: Versuche direktes Laden (funktioniert bei manchen URLs)
-      if (!loaded) {
-        try {
-          console.log('Versuche direktes Laden ohne Proxy');
-          const response = await fetch(url);
-          if (response.ok) {
-            const blob = await response.blob();
-            const objectUrl = URL.createObjectURL(blob);
-            previewImg.src = objectUrl;
-            previewImg.onload = () => initImage(blob.type);
-            loaded = true;
-          }
-        } catch (err) {
-          console.log("Direkter Zugriff fehlgeschlagen:", err.message);
-        }
+
+      // Validiere URL
+      try {
+        new URL(url);
+      } catch {
+        alert("Ungültige URL.");
+        return;
       }
-      
-      if (!loaded) {
-        alert("Fehler beim Laden. Die URL könnte blockiert sein oder der Server antwortet nicht.");
+
+      const statusEl = document.getElementById("zoomLevel");
+      const originalText = statusEl.textContent;
+      statusEl.textContent = "⏳ Lade Bild...";
+      statusEl.style.color = "#ff9800";
+
+      try {
+        const result = await findWorkingProxy(url);
+        if (!result) {
+          throw new Error("Kein verfügbarer Proxy");
+        }
+
+        const objectUrl = URL.createObjectURL(result.blob);
+        previewImg.src = objectUrl;
+        previewImg.onload = () => {
+          initImage(result.blob.type);
+          statusEl.textContent = originalText;
+          statusEl.style.color = "inherit";
+        };
+      } catch (err) {
+        statusEl.textContent = originalText;
+        statusEl.style.color = "inherit";
+        alert("❌ Fehler: Kein Proxy konnte die Datei laden. Bitte überprüfen Sie die URL und versuchen Sie es später erneut.");
       }
     }
 
@@ -264,9 +316,9 @@
       link.click();
     }
 
-    if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+    if ('serviceWorker' in navigator && (window.location.protocol === 'https:' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
       navigator.serviceWorker.register('service-worker.js').catch(err => {
-        console.log('Service Worker Registrierung fehlgeschlagen:', err.message);
+        console.log('Service Worker konnte nicht registriert werden:', err);
       });
     }
   </script>
